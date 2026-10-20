@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "PresentationProject": {
+      "title": "PresentationProject",
+      "description": "A presentation project containing metadata, theme settings, slides, and references.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique project identifier",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the project owner",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Presentation title",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "topic": {
+          "type": "string",
+          "description": "Topic or description of the presentation",
+          "maxLength": 2000
+        },
+        "language": {
+          "type": "string",
+          "description": "Content language code (id or en)",
+          "enum": ["id", "en"]
+        },
+        "aspectRatio": {
+          "type": "string",
+          "description": "Slide aspect ratio (16:9 or 4:3)",
+          "enum": ["16:9", "4:3"]
+        },
+        "templateId": {
+          "type": "string",
+          "description": "Selected template identifier",
+          "maxLength": 128
+        },
+        "slideCount": {
+          "type": "integer",
+          "description": "Total number of slides in the presentation"
+        },
+        "payloadJson": {
+          "type": "string",
+          "description": "Serialized presentation state including slides, theme customization, and references",
+          "maxLength": 900000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "title",
+        "topic",
+        "language",
+        "aspectRatio",
+        "templateId",
+        "slideCount",
+        "payloadJson",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/PresentationProject"
+      },
+      "description": "User presentation projects"
+    }
+  }
+}

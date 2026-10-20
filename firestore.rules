@@ -1,0 +1,90 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidPresentationProject(data) {
+      return data.keys().hasAll([
+        'id',
+        'ownerId',
+        'title',
+        'topic',
+        'language',
+        'aspectRatio',
+        'templateId',
+        'slideCount',
+        'payloadJson',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id',
+        'ownerId',
+        'title',
+        'topic',
+        'language',
+        'aspectRatio',
+        'templateId',
+        'slideCount',
+        'payloadJson',
+        'createdAt',
+        'updatedAt'
+      ]) &&
+      isValidId(data.id) &&
+      isValidId(data.ownerId) &&
+      data.ownerId == request.auth.uid &&
+      data.title is string && data.title.size() >= 1 && data.title.size() <= 300 &&
+      data.topic is string && data.topic.size() <= 2000 &&
+      data.language is string && (data.language == 'id' || data.language == 'en') &&
+      data.aspectRatio is string && (data.aspectRatio == '16:9' || data.aspectRatio == '4:3') &&
+      data.templateId is string && data.templateId.size() >= 1 && data.templateId.size() <= 128 &&
+      data.slideCount is int && data.slideCount >= 1 && data.slideCount <= 100 &&
+      data.payloadJson is string && data.payloadJson.size() >= 2 && data.payloadJson.size() <= 900000 &&
+      data.createdAt is string && data.createdAt.size() >= 10 && data.createdAt.size() <= 64 &&
+      data.updatedAt is string && data.updatedAt.size() >= 10 && data.updatedAt.size() <= 64;
+    }
+
+    match /projects/{projectId} {
+      allow get: if isSignedIn() && isValidId(projectId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(projectId) && incoming().id == projectId && isValidPresentationProject(incoming());
+      allow update: if isSignedIn() && isValidId(projectId) && isValidPresentationProject(incoming()) && (
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title',
+          'topic',
+          'language',
+          'aspectRatio',
+          'templateId',
+          'slideCount',
+          'payloadJson',
+          'updatedAt'
+        ])
+      );
+      allow delete: if isSignedIn() && isValidId(projectId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}
