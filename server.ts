@@ -305,14 +305,16 @@ function saveDatabase(db: StudioDatabase): void {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
 }
 
-function getGeminiClient(customApiKey?: string): GoogleGenAI {
+function getGeminiClient(customApiKey?: string, forceVertex?: boolean): GoogleGenAI {
   const apiKey = customApiKey?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     throw new Error(
-      'API Key Gemini belum diisi. Silakan masukkan API Key Gemini Anda di halaman Pengaturan AI.'
+      'API Key Gemini belum diisi. Silakan masukkan API Key Gemini (format AQ.... atau AIzaSy...) di halaman Pengaturan AI.'
     );
   }
+  const useVertex = forceVertex !== undefined ? forceVertex : apiKey.startsWith('AQ.');
   return new GoogleGenAI({
+    ...(useVertex ? { vertexai: true } : {}),
     apiKey,
     httpOptions: {
       headers: {
@@ -562,44 +564,51 @@ async function executeSingleProviderCall(params: {
     throw new Error(`Hugging Face (${requestedModel}) gagal merespons: ${lastHfError}`);
   }
 
-  // Provider: Google Gemini (supports 3.5, 3.6, 3.1 + automatic fallback across Gemini quota buckets)
-  const ai = getGeminiClient(userSavedKey);
+  // Provider: Google Gemini (supports AQ.... Vertex Express & AIzaSy... keys + 3.5, 3.6, 3.1 models)
+  const resolvedGeminiKey = (userSavedKey || process.env.GEMINI_API_KEY || '').trim();
+  const isAqKey = resolvedGeminiKey.startsWith('AQ.');
+  const geminiClients = isAqKey
+    ? [getGeminiClient(userSavedKey, true), getGeminiClient(userSavedKey, false)]
+    : [getGeminiClient(userSavedKey, false)];
+
   const requestedModel = modelName || 'gemini-3.1-flash-lite';
 
   // Map 3.5 / 3.6 / 3.1 to candidate models so if 3.5/3.6 is aliased or one model hits 429, it rotates seamlessly
   const candidateModels = Array.from(
     new Set([
-      requestedModel,
-      'gemini-3.1-flash-lite',
-      'gemini-flash-latest',
       'gemini-2.5-flash',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
       'gemini-3.8-flash',
+      requestedModel,
     ])
   );
 
   let lastGeminiError: any = null;
-  for (const candidate of candidateModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model: candidate,
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: config.temperature ?? 0.7,
-          topP: config.topP ?? 0.95,
-          ...(responseSchema
-            ? {
-                responseMimeType: 'application/json',
-                responseSchema,
-              }
-            : {}),
-        },
-      });
-      if (response.text) {
-        return response.text;
+  for (const ai of geminiClients) {
+    for (const candidate of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: candidate,
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: config.temperature ?? 0.7,
+            topP: config.topP ?? 0.95,
+            ...(responseSchema
+              ? {
+                  responseMimeType: 'application/json',
+                  responseSchema,
+                }
+              : {}),
+          },
+        });
+        if (response.text) {
+          return response.text;
+        }
+      } catch (err: any) {
+        lastGeminiError = err;
       }
-    } catch (err: any) {
-      lastGeminiError = err;
     }
   }
 

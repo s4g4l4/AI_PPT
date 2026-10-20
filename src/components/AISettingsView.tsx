@@ -39,8 +39,9 @@ const PROVIDER_META: Record<
     label: 'Google Gemini (3.5, 3.6 & 3.1)',
     badge: 'GEMINI',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com',
-    keyPlaceholder: 'AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    keyPrefixHint: 'Masukkan API Key Google Gemini Anda (format AIzaSy...)',
+    keyPlaceholder: 'AQ.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    keyPrefixHint:
+      'Masukkan API Key Google Gemini Anda (Mendukung format AQ.... dari Vertex AI Express maupun AIzaSy... dari Google AI Studio)',
     models: [
       { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Cepat & Seimbang)' },
       { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash (Generasi Terbaru)' },
@@ -563,7 +564,14 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
           <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label className="block text-xs font-bold text-slate-900 dark:text-white">
-                API Key untuk {currentMeta.badge} (Disimpan Sesuai yang Anda Isi)
+                API Key untuk {currentMeta.badge}{' '}
+                <span className="text-blue-600 dark:text-blue-400 font-mono font-medium">
+                  {currentProvider === 'gemini'
+                    ? '(Format AQ... atau AIzaSy...)'
+                    : currentProvider === 'nvidia'
+                    ? '(Format nvapi-...)'
+                    : '(Format hf_...)'}
+                </span>
               </label>
               {formState.hasSavedKey && formState.maskedKey && (
                 <span className="text-xs font-mono font-semibold text-emerald-600 dark:text-emerald-400">

@@ -234,17 +234,19 @@ export async function executeClientSideAICall(params: {
   // Detect mismatched API key prefix to help the user immediately
   if (provider === 'gemini' && cleanKey.startsWith('nvapi-')) {
     throw new Error(
-      'API Key yang Anda masukkan berawalan "nvapi-..." (milik NVIDIA NIM), tetapi Anda sedang memilih provider GEMINI. Silakan pindah ke tab NVIDIA atau masukkan API Key Google Gemini (berawalan "AIzaSy...").'
-    );
-  }
-  if (provider === 'gemini' && cleanKey.startsWith('AQ.')) {
-    throw new Error(
-      'Kunci berawalan "AQ...." bukan format API Key Google Gemini standar. Silakan buat API Key Gemini yang berawalan "AIzaSy..." di https://aistudio.google.com/apikey atau gunakan provider NVIDIA NIM jika Anda memiliki kunci "nvapi-...".'
+      'API Key yang Anda masukkan berawalan "nvapi-..." (milik NVIDIA NIM), tetapi Anda sedang memilih provider GEMINI. Silakan pindah ke tab NVIDIA atau masukkan API Key Google Gemini (format "AQ...." atau "AIzaSy...").'
     );
   }
 
   if (provider === 'gemini') {
-    const ai = new GoogleGenAI({ apiKey: cleanKey });
+    const isAqKey = cleanKey.startsWith('AQ.');
+    const clientsToTry = isAqKey
+      ? [
+          new GoogleGenAI({ vertexai: true, apiKey: cleanKey }),
+          new GoogleGenAI({ apiKey: cleanKey }),
+        ]
+      : [new GoogleGenAI({ apiKey: cleanKey })];
+
     const isProModel = (model || '').includes('pro');
     const candidateModels = Array.from(
       new Set([
@@ -257,27 +259,32 @@ export async function executeClientSideAICall(params: {
     );
 
     let lastErr: any = null;
-    for (const candidate of candidateModels) {
-      try {
-        const resp = await ai.models.generateContent({
-          model: candidate,
-          contents: prompt,
-          config: {
-            systemInstruction,
-            temperature,
-            ...(expectJson ? { responseMimeType: 'application/json' } : {}),
-          },
-        });
-        if (resp.text) {
-          return expectJson ? extractJsonText(resp.text) : resp.text;
-        }
-      } catch (err: any) {
-        lastErr = err;
-        const msg = String(err?.message || '');
-        if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
-          throw new Error(
-            'API Key Google Gemini tidak valid. Pastikan API Key berawalan "AIzaSy..." dari Google AI Studio.'
-          );
+    for (const ai of clientsToTry) {
+      for (const candidate of candidateModels) {
+        try {
+          const resp = await ai.models.generateContent({
+            model: candidate,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              temperature,
+              ...(expectJson ? { responseMimeType: 'application/json' } : {}),
+            },
+          });
+          if (resp.text) {
+            return expectJson ? extractJsonText(resp.text) : resp.text;
+          }
+        } catch (err: any) {
+          lastErr = err;
+          const msg = String(err?.message || '');
+          if (
+            !isAqKey &&
+            (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid'))
+          ) {
+            throw new Error(
+              'API Key Google Gemini tidak valid. Pastikan API Key berformat "AQ...." atau "AIzaSy..." yang aktif.'
+            );
+          }
         }
       }
     }
