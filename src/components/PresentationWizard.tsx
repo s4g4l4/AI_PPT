@@ -12,6 +12,7 @@ import {
   WritingStyleType,
 } from '../types/presentation';
 import { PRESENTATION_TEMPLATES, INITIAL_SAMPLE_PROJECTS } from '../data/templates';
+import { apiRequest } from '../lib/apiClient';
 import {
   ArrowDown,
   ArrowLeft,
@@ -146,7 +147,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
         reader.readAsDataURL(file);
       });
 
-      const response = await fetch('/api/documents/extract', {
+      const { ok, data } = await apiRequest('/api/documents/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,8 +158,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || 'Gagal mengekstrak isi dokumen.');
       }
 
@@ -220,7 +220,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
         reader.readAsDataURL(file);
       });
 
-      const response = await fetch('/api/ai/analyze-visual-style', {
+      const { ok, data } = await apiRequest('/api/ai/analyze-visual-style', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -236,8 +236,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
         }),
       });
 
-      const data = await response.json();
-      if (!response.ok || !data.report) {
+      if (!ok || !data.report) {
         throw new Error(data.error || 'Gagal menganalisis gaya visual file referensi.');
       }
 
@@ -568,7 +567,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
     setStep('C');
 
     try {
-      const response = await fetch('/api/ai/generate-outline', {
+      const { ok, data } = await apiRequest('/api/ai/generate-outline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -576,8 +575,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
           aiConfigId: activeAiConfigId,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || 'Gagal membuat outline dari AI.');
       }
       setOutline(data.outline || []);
@@ -599,7 +597,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
     });
 
     try {
-      const response = await fetch('/api/ai/generate-single-slide', {
+      const { ok, data } = await apiRequest('/api/ai/generate-single-slide', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -609,8 +607,7 @@ export const PresentationWizard: React.FC<PresentationWizardProps> = ({
           aiConfigId: activeAiConfigId,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || `Gagal membuat Slide ${item.slideNumber}`);
       }
       const generated: SlideData = data.slide;

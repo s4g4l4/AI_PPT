@@ -10,6 +10,7 @@ import {
 import { PRESENTATION_TEMPLATES } from '../data/templates';
 import { SlideCanvasPreview } from './SlideCanvasPreview';
 import { analyzePresentationQuality } from '../lib/qualityChecker';
+import { apiRequest } from '../lib/apiClient';
 import {
   AlignCenter,
   AlignLeft,
@@ -371,7 +372,7 @@ export const SlideEditorView: React.FC<SlideEditorViewProps> = ({
   const runSlideAiAction = async (action: SlideAIActionType) => {
     setRunningAiAction(action);
     try {
-      const response = await fetch('/api/ai/slide-action', {
+      const { ok, data } = await apiRequest('/api/ai/slide-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -389,8 +390,7 @@ export const SlideEditorView: React.FC<SlideEditorViewProps> = ({
           aiConfigId: activeAiConfigId,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || 'Gagal menjalankan AI Tool.');
       }
       setAiProposal({

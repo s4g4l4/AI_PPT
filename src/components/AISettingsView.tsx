@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AIProviderConfig, AIProviderType } from '../types/presentation';
+import { apiRequest } from '../lib/apiClient';
 import {
   AlertCircle,
   CheckCircle2,
@@ -195,7 +196,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
     if (e) e.stopPropagation();
     setSettingDefaultId(cfg.id);
     try {
-      const response = await fetch('/api/ai/configs', {
+      const { ok, data } = await apiRequest('/api/ai/configs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,8 +204,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
           isDefault: true,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || 'Gagal mengubah profil default.');
       }
       await onRefreshConfigs();
@@ -224,7 +224,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
     setTestingConnection(true);
     setTestResult(null);
     try {
-      const response = await fetch('/api/ai/test-connection', {
+      const { ok, data } = await apiRequest('/api/ai/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -233,8 +233,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
           apiKeyInput: apiKeyInput.trim() || undefined,
         }),
       });
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
+      if (!ok || !data.ok) {
         setTestResult({
           ok: false,
           message: data.error || 'Pengujian koneksi ke penyedia AI gagal.',
@@ -257,7 +256,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
         ok: false,
         message: err.message || 'Kesalahan jaringan saat menguji koneksi.',
       });
-      onNotify('Kesalahan jaringan saat menguji koneksi.', 'error');
+      onNotify(err.message || 'Kesalahan jaringan saat menguji koneksi.', 'error');
     } finally {
       setTestingConnection(false);
     }
@@ -270,7 +269,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
     }
     setSavingConfig(true);
     try {
-      const response = await fetch('/api/ai/configs', {
+      const { ok, data } = await apiRequest('/api/ai/configs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -279,8 +278,7 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
           apiKeyInput: apiKeyInput.trim() || undefined,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
+      if (!ok) {
         throw new Error(data.error || 'Gagal menyimpan konfigurasi AI.');
       }
       setApiKeyInput('');
@@ -308,9 +306,8 @@ export const AISettingsView: React.FC<AISettingsViewProps> = ({
       return;
     }
     try {
-      const response = await fetch(`/api/ai/configs/${id}`, { method: 'DELETE' });
-      const data = await response.json();
-      if (!response.ok) {
+      const { ok, data } = await apiRequest(`/api/ai/configs/${id}`, { method: 'DELETE' });
+      if (!ok) {
         throw new Error(data.error || 'Gagal menghapus konfigurasi.');
       }
       await onRefreshConfigs();

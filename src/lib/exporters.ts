@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { PresentationProject } from '../types/presentation';
 import { PRESENTATION_TEMPLATES } from '../data/templates';
+import { generateClientSidePptxBlob } from './apiClient';
 
 function hexToRgb(hex: string, fallback: [number, number, number]): [number, number, number] {
   const clean = (hex || '').replace('#', '').trim();
@@ -13,24 +14,28 @@ function hexToRgb(hex: string, fallback: [number, number, number]): [number, num
 }
 
 export async function downloadPresentationPptx(project: PresentationProject): Promise<void> {
-  const response = await fetch('/api/export/pptx', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project }),
-  });
-
-  if (!response.ok) {
-    let errMsg = 'Gagal mengekspor file PPTX.';
-    try {
-      const errData = await response.json();
-      if (errData.error) errMsg = errData.error;
-    } catch {
-      // ignore
+  let blob: Blob | null = null;
+  try {
+    const response = await fetch('/api/export/pptx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project }),
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (
+      response.ok &&
+      (contentType.includes('presentationml') || contentType.includes('octet-stream'))
+    ) {
+      blob = await response.blob();
     }
-    throw new Error(errMsg);
+  } catch {
+    // Fall back to client-side PPTX generator
   }
 
-  const blob = await response.blob();
+  if (!blob) {
+    blob = await generateClientSidePptxBlob(project);
+  }
+
   const safeName =
     (project.title || 'Presentasi_AI_PPT_Studio')
       .replace(/[^a-zA-Z0-9_\-\s]/g, '')

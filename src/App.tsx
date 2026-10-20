@@ -16,6 +16,7 @@ import {
   HelpDocumentationView,
 } from './components/StudioViews';
 import { downloadPresentationPptx, downloadPresentationPdf } from './lib/exporters';
+import { apiRequest, loadLocalConfigs } from './lib/apiClient';
 import {
   auth,
   onAuthStateChanged,
@@ -105,7 +106,7 @@ export default function App() {
   const [deletingProject, setDeletingProject] = useState<PresentationProject | null>(null);
 
   // AI Provider Configurations
-  const [aiConfigs, setAiConfigs] = useState<AIProviderConfig[]>([]);
+  const [aiConfigs, setAiConfigs] = useState<AIProviderConfig[]>(() => loadLocalConfigs());
   const [activeAiConfigId, setActiveAiConfigId] = useState<string>('');
 
   // Firebase Auth User
@@ -122,28 +123,23 @@ export default function App() {
     }, 4200);
   }, []);
 
-  // Load initial projects and AI configs from backend
+  // Load initial projects and AI configs from backend (with automatic client-side fallback on Vercel)
   const fetchProjectsAndConfigs = useCallback(async () => {
     setLoadingProjects(true);
     try {
       const [projRes, cfgRes] = await Promise.all([
-        fetch('/api/projects'),
-        fetch('/api/ai/configs'),
+        apiRequest('/api/projects'),
+        apiRequest('/api/ai/configs'),
       ]);
-      if (projRes.ok) {
-        const projData = await projRes.json();
-        if (Array.isArray(projData.projects) && projData.projects.length > 0) {
-          setProjects(projData.projects);
-          setActiveProjectId((prev) => prev || projData.projects[0].id);
-        }
+      if (projRes.ok && Array.isArray(projRes.data?.projects) && projRes.data.projects.length > 0) {
+        setProjects(projRes.data.projects);
+        setActiveProjectId((prev) => prev || projRes.data.projects[0].id);
       }
-      if (cfgRes.ok) {
-        const cfgData = await cfgRes.json();
-        if (Array.isArray(cfgData.configs)) {
-          setAiConfigs(cfgData.configs);
-          const def = cfgData.configs.find((c: AIProviderConfig) => c.isDefault) || cfgData.configs[0];
-          if (def) setActiveAiConfigId(def.id);
-        }
+      if (cfgRes.ok && Array.isArray(cfgRes.data?.configs)) {
+        setAiConfigs(cfgRes.data.configs);
+        const def =
+          cfgRes.data.configs.find((c: AIProviderConfig) => c.isDefault) || cfgRes.data.configs[0];
+        if (def) setActiveAiConfigId(def.id);
       }
     } catch {
       // Fallback to initial sample projects if offline
@@ -197,7 +193,7 @@ export default function App() {
       if (!autosaveEnabled) return;
 
       try {
-        await fetch('/api/projects', {
+        await apiRequest('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(project),
@@ -219,18 +215,15 @@ export default function App() {
 
   const handleDuplicateProject = async (proj: PresentationProject) => {
     try {
-      const response = await fetch(`/api/projects/${proj.id}/duplicate`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const copy = data.project as PresentationProject;
-        setProjects((prev) => [copy, ...prev]);
-        if (firebaseUser) {
-          await syncProjectToFirestore(copy).catch(() => {});
-        }
-        notify(`Proyek "${copy.title}" berhasil diduplikasi.`, 'success');
-      }
+      const copy: PresentationProject = {
+        ...proj,
+        id: `proj-${Date.now()}`,
+        title: `${proj.title} (Salinan)`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await saveProjectToServerAndCloud(copy);
+      notify(`Proyek "${copy.title}" berhasil diduplikasi.`, 'success');
     } catch {
       notify('Gagal menduplikasi proyek.', 'error');
     }
@@ -263,7 +256,7 @@ export default function App() {
     setDeletingProject(null);
 
     try {
-      await fetch(`/api/projects/${targetId}`, { method: 'DELETE' });
+      await apiRequest(`/api/projects/${targetId}`, { method: 'DELETE' });
       if (firebaseUser) {
         await deleteProjectFromFirestore(targetId);
       }
